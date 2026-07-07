@@ -11,6 +11,8 @@ import { ensurePinyin } from './pinyin'
 export interface ImportResult {
   pack: Pack
   items: Item[]
+  /** 無効データ(zhなし等)としてスキップされた件数 */
+  skipped: number
 }
 
 const VALID_TYPES: ItemType[] = ['word', 'sentence', 'article']
@@ -129,7 +131,7 @@ export function importJson(text: string, fallbackName: string): ImportResult {
     throw new Error('有効な教材がありませんでした。各教材に zh(中国語)が必要です。')
   }
 
-  return { pack, items }
+  return { pack, items, skipped: rawItems.length - items.length }
 }
 
 /**
@@ -154,7 +156,7 @@ export function importCsv(text: string, fallbackName: string): ImportResult {
     throw new Error('有効な教材がありませんでした。zh列(中国語)が必要です。')
   }
 
-  return { pack, items }
+  return { pack, items, skipped: result.data.length - items.length }
 }
 
 /** ファイル名と内容からJSON/CSVを自動判別してインポートする */

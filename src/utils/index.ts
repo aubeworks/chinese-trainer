@@ -45,6 +45,15 @@ export function isDueToday(iso: string | null): boolean {
   return new Date(iso) <= end
 }
 
+/** ISO日時を「YYYY-MM-DD HH:mm」形式に整形する */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${todayStr(d)} ${h}:${m}`
+}
+
 /** ISO日時が今日かどうか */
 export function isToday(iso: string): boolean {
   if (!iso) return false

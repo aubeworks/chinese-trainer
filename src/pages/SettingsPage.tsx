@@ -4,7 +4,7 @@ import SpeedSelector from '../components/SpeedSelector'
 import VoiceSelector from '../components/VoiceSelector'
 import { useApp } from '../store/AppContext'
 import { exportAll, parseFullExport } from '../services/importExport'
-import { downloadFile, todayStr } from '../utils'
+import { downloadFile, formatDateTime, nowIso, todayStr } from '../utils'
 import { speakZh } from '../services/speech'
 import type { ThemeMode } from '../types'
 
@@ -25,6 +25,8 @@ export default function SettingsPage() {
       queue: app.queue,
     })
     downloadFile(`chinese-trainer-backup-${todayStr()}.json`, json)
+    // 最終バックアップ日時を記録
+    updateSettings({ lastBackupAt: nowIso() })
   }
 
   const restore = async (file: File) => {
@@ -99,6 +101,10 @@ export default function SettingsPage() {
       <h2 className="section-title">データ管理</h2>
       {message && <div className="info-box">{message}</div>}
       {error && <div className="error-box">{error}</div>}
+      <div className="info-box">
+        最終バックアップ:{' '}
+        <strong>{settings.lastBackupAt ? formatDateTime(settings.lastBackupAt) : '未実施'}</strong>
+      </div>
       <div className="btn-row" style={{ marginBottom: 10 }}>
         <button type="button" className="btn btn-primary" onClick={backup}>
           💾 全データバックアップ(JSON)
@@ -125,6 +131,34 @@ export default function SettingsPage() {
         <button type="button" className="btn btn-danger" onClick={() => void reset()}>
           🗑 全データ初期化
         </button>
+      </div>
+
+      <h2 className="section-title">データ統計</h2>
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="stat-card">
+          <div className="stat-value">{app.items.length}</div>
+          <div className="stat-label">教材数</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{app.packs.length}</div>
+          <div className="stat-label">教材パック数</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{app.playlists.length}</div>
+          <div className="stat-label">プレイリスト数</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{app.queue.length}</div>
+          <div className="stat-label">学習キュー件数</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{app.items.filter((i) => i.favorite).length}</div>
+          <div className="stat-label">お気に入り件数</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{app.items.filter((i) => i.weak).length}</div>
+          <div className="stat-label">苦手件数</div>
+        </div>
       </div>
 
       <h2 className="section-title">アプリ情報</h2>

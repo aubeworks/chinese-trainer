@@ -119,6 +119,8 @@ export interface Settings {
   recentPlaylistIds: string[]
   /** 最近使った教材パックID */
   recentPackIds: string[]
+  /** 最終バックアップ日時(ISO文字列。未実施はnull) */
+  lastBackupAt: string | null
 }
 
 /** JSONエクスポート形式(教材パック単位) */

@@ -2,9 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// GitHub Pagesへのデプロイ時はリポジトリ名をbaseにする(GitHub Actionsで GHPAGES=true を設定)
+const isGhPages = process.env.GHPAGES === 'true'
+
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: isGhPages ? '/chinese-trainer/' : './',
   plugins: [
     react(),
     VitePWA({

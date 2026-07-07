@@ -67,23 +67,27 @@ export default function PacksPage() {
     downloadFile(`${pack.name}.json`, exportPack(pack, items))
   }
 
-  /** ファイル(JSON/CSV)をインポートする */
+  /** ファイル(JSON/CSV)をインポートし、追加/重複/スキップ/エラー件数を表示する */
   const handleFiles = async (files: FileList | File[]) => {
     setError('')
     setMessage('')
     const results: string[] = []
+    const errors: string[] = []
     for (const file of Array.from(files)) {
       try {
         const text = await file.text()
-        const { pack, items: newItems } = importFile(file.name, text)
-        importPackData(pack, newItems)
-        results.push(`${pack.name}: ${newItems.length}件`)
+        const { pack, items: newItems, skipped } = importFile(file.name, text)
+        const { added, duplicates } = importPackData(pack, newItems)
+        results.push(
+          `【${pack.name}】 ${added}件追加 / ${duplicates}件重複 / ${skipped}件スキップ / 0件エラー`
+        )
       } catch (e) {
         // インポート失敗時も既存データは保持される
-        setError(`${file.name}: ${e instanceof Error ? e.message : '読み込みに失敗しました'}`)
+        errors.push(`${file.name}: ${e instanceof Error ? e.message : '読み込みに失敗しました'}(1件エラー)`)
       }
     }
-    if (results.length > 0) setMessage(`インポート完了 → ${results.join(' / ')}`)
+    if (results.length > 0) setMessage(`インポート結果\n${results.join('\n')}`)
+    if (errors.length > 0) setError(errors.join('\n'))
   }
 
   const onDrop = (e: DragEvent) => {
@@ -125,8 +129,8 @@ export default function PacksPage() {
         </div>
       </div>
 
-      {message && <div className="info-box">{message}</div>}
-      {error && <div className="error-box">{error}</div>}
+      {message && <div className="info-box" style={{ whiteSpace: 'pre-line' }}>{message}</div>}
+      {error && <div className="error-box" style={{ whiteSpace: 'pre-line' }}>{error}</div>}
 
       <div className="btn-row" style={{ marginBottom: 16 }}>
         <button type="button" className="btn btn-primary" onClick={() => startEdit(null)}>

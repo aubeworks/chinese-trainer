@@ -39,6 +39,13 @@ export const DEFAULT_SETTINGS: Settings = {
   flashSeconds: 5,
   recentPlaylistIds: [],
   recentPackIds: [],
+  lastBackupAt: null,
+}
+
+/** インポート結果の統計 */
+export interface ImportStats {
+  added: number
+  duplicates: number
 }
 
 interface AppState {
@@ -56,7 +63,7 @@ interface AppActions {
   addPack: (data: Partial<Pack>) => Pack
   updatePack: (id: string, data: Partial<Pack>) => void
   removePack: (id: string, deleteItems: boolean) => void
-  importPackData: (pack: Pack, items: Item[]) => void
+  importPackData: (pack: Pack, items: Item[]) => ImportStats
   // 教材
   addItem: (data: Partial<Item>) => Item
   updateItem: (id: string, data: Partial<Item>) => void
@@ -95,6 +102,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [queue, setQueueState] = useState<string[]>([])
   const loaded = useRef(false)
+
+  // インポート時の重複判定用に最新の教材リストを参照するref
+  // (連続インポートでもstateの反映を待たずに正しく判定できるようにする)
+  const itemsRef = useRef<Item[]>(items)
+  itemsRef.current = items
 
   // 起動時に全データを読み込む。初回起動時はサンプルデータを投入する。
   useEffect(() => {
@@ -164,20 +176,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  /** インポートした教材パックを取り込む(既存IDと衝突する場合はマージ) */
-  const importPackData = useCallback((pack: Pack, newItems: Item[]) => {
+  /**
+   * インポートした教材パックを取り込み、追加/重複の統計を返す。
+   * 重複判定: 既存と同じID、または同一パック内で同じ中国語(zh)の教材。
+   * 重複した教材は追加せず、既存データを保持する。
+   */
+  const importPackData = useCallback((pack: Pack, newItems: Item[]): ImportStats => {
     setPacks((prev) => {
       const exists = prev.some((p) => p.id === pack.id)
       const next = exists ? prev.map((p) => (p.id === pack.id ? { ...p, ...pack, updatedAt: nowIso() } : p)) : [...prev, pack]
       void storage.savePack(pack)
       return next
     })
-    setItems((prev) => {
-      const map = new Map(prev.map((i) => [i.id, i]))
-      for (const item of newItems) map.set(item.id, item)
-      void storage.saveItems(newItems)
-      return [...map.values()]
-    })
+
+    const existing = itemsRef.current
+    const ids = new Set(existing.map((i) => i.id))
+    const zhInPack = new Set(existing.filter((i) => i.packId === pack.id).map((i) => i.zh))
+    const toAdd: Item[] = []
+    let duplicates = 0
+    for (const item of newItems) {
+      if (ids.has(item.id) || zhInPack.has(item.zh)) {
+        duplicates++
+        continue
+      }
+      ids.add(item.id)
+      zhInPack.add(item.zh)
+      toAdd.push(item)
+    }
+
+    if (toAdd.length > 0) {
+      // 同一バッチ内の連続インポートに備えてrefも即時更新する
+      itemsRef.current = [...existing, ...toAdd]
+      setItems((prev) => [...prev, ...toAdd])
+      void storage.saveItems(toAdd)
+    }
+    return { added: toAdd.length, duplicates }
   }, [])
 
   // ---- 教材 ----

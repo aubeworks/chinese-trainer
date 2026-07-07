@@ -28,6 +28,51 @@ npm run preview
 
 ブラウザで `http://localhost:5173` を開きます。
 
+## GitHub Pagesでの公開(スマホからのアクセスにおすすめ)
+
+- **公開URL**: https://aubeworks.github.io/chinese-trainer/
+- HTTPSで配信されるため、スマホの「ホーム画面に追加」(PWA)やオフライン利用も有効になります
+
+### 更新方法(公開サイトへの反映)
+
+```bash
+npm run deploy
+```
+
+このコマンド1つで、Pages用ビルド(`base=/chinese-trainer/`)を作成し、`gh-pages` ブランチへpushして公開されます(反映まで1〜2分)。
+
+ソースコード自体の保存は通常どおり `git push`(mainブランチ)で行ってください。
+
+### 公開状況の確認方法
+
+- 公開URLをブラウザで開いて確認(反映まで1〜2分かかります)
+- リポジトリの **Settings → Pages** に公開URLと状態が表示されます
+- リポジトリの **Actionsタブ** の「pages build and deployment」が緑(✓)になれば反映完了
+
+### mainへのpushだけで自動デプロイしたい場合(推奨・1回だけの設定)
+
+GitHub Actionsによる自動デプロイのワークフローは [docs/deploy-workflow.yml](docs/deploy-workflow.yml) に用意済みです。
+現在のGit認証トークン(PAT)に `workflow` スコープがないためリポジトリへ配置できていません。以下の手順で有効化できます。
+
+1. https://github.com/settings/tokens で使用中のPATに **workflow** スコープを追加(または新規発行してGit認証を更新)
+2. ワークフローを配置してpush:
+   ```bash
+   mkdir -p .github/workflows
+   git mv docs/deploy-workflow.yml .github/workflows/deploy.yml
+   git commit -m "Enable GitHub Actions deploy"
+   git push
+   ```
+3. リポジトリの **Settings → Pages → Source** を **「GitHub Actions」** に変更
+
+以後は `git push`(main)だけで自動的に公開されます。
+
+### 仕組み
+
+- Pages用ビルドでは環境変数 `GHPAGES=true` により Vite の `base` が `/chinese-trainer/` になります(ローカルは従来どおり)
+- 手動デプロイは [scripts/deploy.mjs](scripts/deploy.mjs) が `dist/` を `gh-pages` ブランチへforce pushします
+
+> **注意**: GitHub Pages(無料プラン)を使うため、このリポジトリは**公開(public)**になっています。
+
 > 音声再生はブラウザのWeb Speech APIを使用します。Windows/Edge/Chrome、iOS Safari、Androidで中国語音声が利用できます。OSに中国語音声がない場合は、OSの設定から音声(zh-CN)を追加してください。
 
 ## 主な画面
@@ -48,7 +93,7 @@ npm run preview
 | 教材生成プロンプト | ChatGPT/Claude用の教材生成プロンプトを作成・コピー |
 | SRS復習 | 今日の復習予定・苦手・今日追加・今日学習済み |
 | 学習履歴 | 日別の学習件数と累計 |
-| 設定 | テーマ・音声・速度・RSSプロキシ・バックアップ/復元/初期化 |
+| 設定 | テーマ・音声・速度・RSSプロキシ・データ統計・バックアップ/復元/初期化 |
 
 ## 教材の追加方法
 
@@ -57,6 +102,9 @@ npm run preview
 1. アプリの「教材生成プロンプト」画面で条件を選び、プロンプトをコピー
 2. ChatGPTやClaudeに貼り付けてJSONを生成させる
 3. 「教材パック」画面にJSONファイルをドラッグ&ドロップ(またはファイル選択)
+
+インポート後は **追加件数 / 重複件数 / スキップ件数 / エラー件数** が表示されます。
+既存と同じID、または同一パック内に同じ中国語がある教材は「重複」として追加されません(既存データが優先されます)。
 
 ### 2. 手入力
 
@@ -138,6 +186,9 @@ category,type,zh,ja,pinyin,memo,difficulty,tags
 ## バックアップ
 
 設定画面の「全データバックアップ」でJSONを書き出せます。端末やブラウザを変えるときは、このJSONを「バックアップから復元」で読み込んでください。
+
+- 設定画面に **最終バックアップ日時** が表示されます(未実施の場合は「未実施」)
+- 設定画面の **データ統計** で教材数・パック数・プレイリスト数・学習キュー件数・お気に入り件数・苦手件数をリアルタイムに確認できます
 
 ## 今後の拡張方法
 
