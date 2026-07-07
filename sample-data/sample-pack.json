@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "pack": {
+    "id": "sample-import-pack",
+    "name": "インポートサンプル",
+    "description": "JSONインポートの動作確認用サンプル",
+    "icon": "📥",
+    "color": "#0e7490"
+  },
+  "items": [
+    {
+      "type": "word",
+      "category": "化学",
+      "subcategory": "銅箔",
+      "tags": ["銅箔", "Kingboard"],
+      "difficulty": 2,
+      "zh": "铜箔",
+      "ja": "銅箔",
+      "pinyin": "tóng bó",
+      "memo": "",
+      "source": "サンプル",
+      "author": "Claude"
+    },
+    {
+      "type": "sentence",
+      "category": "営業",
+      "subcategory": "価格交渉",
+      "tags": ["値上げ"],
+      "difficulty": 3,
+      "zh": "我们希望能重新讨论一下价格条件。",
+      "ja": "価格条件について改めて協議したいと考えています。",
+      "pinyin": "",
+      "memo": "ピンインは空欄でも自動生成されます",
+      "source": "サンプル",
+      "author": "Claude"
+    },
+    {
+      "type": "article",
+      "category": "ニュース",
+      "subcategory": "貿易",
+      "tags": ["輸出"],
+      "difficulty": 4,
+      "zh": "今年上半年,化学品出口保持增长。业内人士认为,下半年市场仍有不确定性。\n企业需要密切关注原材料价格和汇率的变化。",
+      "ja": "今年上半期、化学品の輸出は成長を維持した。業界関係者は、下半期の市場には依然として不確実性があると見ている。\n企業は原材料価格と為替レートの変動を注視する必要がある。",
+      "pinyin": "",
+      "memo": "",
+      "source": "サンプル",
+      "author": "Claude"
+    }
+  ]
+}
