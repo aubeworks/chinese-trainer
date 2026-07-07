@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
 import { useApp } from '../store/AppContext'
 import { exportPack, importFile } from '../services/importExport'
+import { LIBRARY_INDEX, getLibraryPack } from '../data/library'
 import { downloadFile } from '../utils'
 import type { Pack } from '../types'
 
@@ -94,6 +95,28 @@ export default function PacksPage() {
     e.preventDefault()
     setDragging(false)
     if (e.dataTransfer.files.length > 0) void handleFiles(e.dataTransfer.files)
+  }
+
+  /** 内蔵ライブラリのパックを追加する */
+  const addLibraryPack = (id: string) => {
+    const data = getLibraryPack(id)
+    if (!data) return
+    const { added, duplicates } = importPackData(data.pack, data.items)
+    setMessage(`【${data.pack.name}】 ${added}件追加 / ${duplicates}件重複 / 0件スキップ / 0件エラー`)
+    setError('')
+  }
+
+  /** 内蔵ライブラリをすべて追加する */
+  const addAllLibraryPacks = () => {
+    const lines: string[] = []
+    for (const entry of LIBRARY_INDEX) {
+      const data = getLibraryPack(entry.id)
+      if (!data) continue
+      const { added, duplicates } = importPackData(data.pack, data.items)
+      lines.push(`【${data.pack.name}】 ${added}件追加 / ${duplicates}件重複`)
+    }
+    setMessage(`ライブラリ追加結果\n${lines.join('\n')}`)
+    setError('')
   }
 
   return (
@@ -202,6 +225,45 @@ export default function PacksPage() {
         </div>
       )}
 
+      {/* 内蔵教材ライブラリ */}
+      <h2 className="section-title">📚 内蔵教材ライブラリ</h2>
+      <p className="page-sub" style={{ margin: '0 0 10px' }}>
+        ワンクリックで追加できる教材集です(合計
+        {LIBRARY_INDEX.reduce((sum, e) => sum + e.count, 0)}件)。追加済みでも重複はスキップされます。
+      </p>
+      <div className="btn-row" style={{ marginBottom: 10 }}>
+        <button type="button" className="btn btn-sm btn-primary" onClick={addAllLibraryPacks}>
+          ⬇ すべて追加
+        </button>
+      </div>
+      {LIBRARY_INDEX.map((entry) => {
+        const added = packs.some((p) => p.id === entry.id)
+        return (
+          <div
+            key={entry.id}
+            className="card"
+            style={{ marginBottom: 8, borderLeft: `5px solid ${entry.color}`, padding: '10px 14px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.3rem' }}>{entry.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700 }}>
+                  {entry.name} <span className="badge">{entry.count}件</span>
+                  {added && <span className="badge fav">追加済み</span>}
+                </div>
+                <div className="ja-text" style={{ fontSize: '0.8rem' }}>
+                  {entry.description}
+                </div>
+              </div>
+              <button type="button" className="btn btn-sm" onClick={() => addLibraryPack(entry.id)}>
+                {added ? '↻ 再追加' : '⬇ 追加'}
+              </button>
+            </div>
+          </div>
+        )
+      })}
+
+      <h2 className="section-title">📦 マイ教材パック</h2>
       {/* パック一覧 */}
       {packs.length === 0 ? (
         <EmptyState message="教材パックがありません" hint="新規作成またはインポートしてください" />
