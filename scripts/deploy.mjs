@@ -5,32 +5,40 @@
 // origin へ force push する。Pagesのソースが gh-pages ブランチに
 // 設定されていれば、1〜2分で公開される。
 //
+// メインリポジトリのGit(認証設定込み)でコミットを作成するため、
+// 一時リポジトリを作る方式より認証まわりが安定する。
+//
 // 備考: PAT(Personal Access Token)に workflow スコープを追加すれば、
 // docs/deploy-workflow.yml を .github/workflows/ へ移動することで
 // mainへのpushだけで自動デプロイされるGitHub Actions方式に切り替えられる。
 import { execSync } from 'node:child_process'
-import { writeFileSync, existsSync, rmSync } from 'node:fs'
+import { writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
-const run = (cmd, opts = {}) => {
+const run = (cmd, env = {}) => {
   console.log(`> ${cmd}`)
-  execSync(cmd, { stdio: 'inherit', ...opts })
+  return execSync(cmd, { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...env } })
+    .toString()
+    .trim()
 }
 
 // 1. Pages用ビルド(base=/chinese-trainer/)
-run('npm run build', { env: { ...process.env, GHPAGES: 'true' } })
+run('npm run build', { GHPAGES: 'true' })
 
-// 2. originのURLを取得
-const origin = execSync('git remote get-url origin').toString().trim()
+// 2. Jekyll処理を無効化
+writeFileSync(join(process.cwd(), 'dist', '.nojekyll'), '')
 
-// 3. dist/ を gh-pages ブランチとしてpush
-const dist = join(process.cwd(), 'dist')
-writeFileSync(join(dist, '.nojekyll'), '') // Jekyll処理を無効化
-if (existsSync(join(dist, '.git'))) rmSync(join(dist, '.git'), { recursive: true, force: true })
-run('git init -b gh-pages', { cwd: dist })
-run('git add -A', { cwd: dist })
-run('git -c user.name="deploy" -c user.email="deploy@local" commit -m "Deploy to GitHub Pages"', { cwd: dist })
-run(`git push -f "${origin}" gh-pages`, { cwd: dist })
-rmSync(join(dist, '.git'), { recursive: true, force: true })
+// 3. 一時インデックスで dist/ の内容だけのツリーを作成し、コミットしてpush
+const tmpIndex = join(process.cwd(), '.git', 'gh-pages-index')
+const env = { GIT_INDEX_FILE: tmpIndex }
+try {
+  run('git read-tree --empty', env)
+  run('git --work-tree=dist add -A', env)
+  const tree = run('git write-tree', env)
+  const commit = run(`git commit-tree ${tree} -m "Deploy to GitHub Pages"`, env)
+  run(`git push -f origin ${commit}:refs/heads/gh-pages`)
+} finally {
+  rmSync(tmpIndex, { force: true })
+}
 
 console.log('\n公開URL: https://aubeworks.github.io/chinese-trainer/ (反映まで1〜2分)')
