@@ -1,7 +1,8 @@
 // 聞き流し画面: アプリの中心機能
 // 中国語→ピンイン→日本語を中央に表示し、下部の操作バーで再生を制御する。
+// 画面を開いたまま、再生対象(教材パック・プレイリスト等)を切り替えられる。
 // キーボードショートカット: Space=再生/停止, ←→=前へ/次へ
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import SpeedSelector from '../components/SpeedSelector'
 import VoiceSelector from '../components/VoiceSelector'
@@ -13,10 +14,11 @@ import { useVoices } from '../hooks/useVoices'
 import { PLAY_MODE_LABELS, type PlayMode } from '../types'
 
 export default function ListenPage() {
-  const { settings, updateSettings, updateItem, recordStudy } = useApp()
+  const { settings, updateSettings, updateItem, recordStudy, packs, playlists, queue, touchRecentPack, touchRecentPlaylist } =
+    useApp()
   const { items, label, src } = useSourceItems()
   const { available } = useVoices()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const [shuffle, setShuffle] = useState(false)
   const [repeat, setRepeat] = useState(true)
 
@@ -31,6 +33,64 @@ export default function ListenPage() {
   })
 
   const current = player.current
+
+  // 再生対象が変わったら先頭に戻す
+  const prevSrcRef = useRef(src)
+  useEffect(() => {
+    if (prevSrcRef.current !== src) {
+      prevSrcRef.current = src
+      player.jumpTo(0)
+    }
+    // playerは毎レンダー新しい参照になるため依存から除外
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src])
+
+  /** 再生対象を切り替える(再生中は一旦停止) */
+  const changeSource = (value: string) => {
+    player.pause()
+    if (value === 'all') {
+      setParams({})
+    } else {
+      setParams({ src: value })
+    }
+    // ホーム画面の「最近使った」に反映
+    if (value.startsWith('pack:')) touchRecentPack(value.slice(5))
+    if (value.startsWith('playlist:')) touchRecentPlaylist(value.slice(9))
+  }
+
+  /** 再生対象セレクター(通常表示・空表示の両方で使う) */
+  const sourceSelector = (
+    <select
+      value={src}
+      onChange={(e) => changeSource(e.target.value)}
+      aria-label="再生対象の選択"
+      style={{ width: 'auto', maxWidth: '100%' }}
+    >
+      <option value="all">📚 すべての教材</option>
+      <option value="queue">📋 学習キュー ({queue.length})</option>
+      <option value="srs">🔁 今日のSRS復習</option>
+      <option value="weak">⚠ 苦手</option>
+      <option value="favorite">★ お気に入り</option>
+      {packs.length > 0 && (
+        <optgroup label="教材パック">
+          {packs.map((p) => (
+            <option key={p.id} value={`pack:${p.id}`}>
+              {p.icon} {p.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {playlists.length > 0 && (
+        <optgroup label="プレイリスト">
+          {playlists.map((pl) => (
+            <option key={pl.id} value={`playlist:${pl.id}`}>
+              🎵 {pl.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </select>
+  )
 
   // キーボードショートカット(PC)
   useEffect(() => {
@@ -54,13 +114,13 @@ export default function ListenPage() {
     return (
       <div className="page">
         <h1 className="page-title">聞き流し</h1>
+        <div className="btn-row" style={{ marginBottom: 8 }}>{sourceSelector}</div>
         <EmptyState
           icon="🎧"
           message={`「${label}」に再生できる教材がありません`}
-          hint="教材を追加するか、別の対象を選んでください"
+          hint="教材を追加するか、上のセレクターで別の対象を選んでください"
         />
         <div className="btn-row">
-          <Link to="/listen" className="btn btn-sm">すべての教材</Link>
           <Link to="/items" className="btn btn-sm">教材一覧へ</Link>
         </div>
       </div>
@@ -70,10 +130,13 @@ export default function ListenPage() {
   return (
     <div className="page player-page">
       <h1 className="page-title">聞き流し</h1>
-      <p className="page-sub">
-        {label}({player.index + 1} / {player.ordered.length})
-        {params.get('src')?.startsWith('srs') && ' - SRS復習として記録されます'}
-      </p>
+      <div className="btn-row" style={{ marginBottom: 8 }}>
+        {sourceSelector}
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          {player.index + 1} / {player.ordered.length}
+          {params.get('src') === 'srs' && ' - SRS復習として記録されます'}
+        </span>
+      </div>
 
       {!available && <div className="error-box">中国語音声が利用できません。表示のみで学習できます。</div>}
 
