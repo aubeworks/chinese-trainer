@@ -11,7 +11,7 @@ export type SrsStatus = 'new' | 'review' | 'mastered'
 export type SrsGrade = 'again' | 'good' | 'easy'
 
 /** 再生モード */
-export type PlayMode = 'zh-ja-zh' | 'zh' | 'zh3' | 'fast'
+export type PlayMode = 'zh-ja-zh' | 'zh' | 'zh3' | 'fast' | 'shadow'
 
 /** テーマ */
 export type ThemeMode = 'light' | 'dark' | 'auto'
@@ -121,6 +121,12 @@ export interface Settings {
   recentPackIds: string[]
   /** 最終バックアップ日時(ISO文字列。未実施はnull) */
   lastBackupAt: string | null
+  /** シャドーイング: 復唱ポーズの長さ倍率(0.8=短め / 1.2=標準 / 1.6=長め) */
+  shadowPauseScale: number
+  /** シャドーイング: ポーズ後にもう一度再生する(答え合わせ) */
+  shadowRepeat: boolean
+  /** シャドーイング: 再生・ポーズ中は文字を隠す(上級) */
+  shadowHideText: boolean
 }
 
 /** JSONエクスポート形式(教材パック単位) */
@@ -174,6 +180,7 @@ export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
   zh: '中国語のみ',
   zh3: '中国語3回',
   fast: '高速中国語',
+  shadow: 'シャドーイング',
 }
 
 /** データバージョン(JSON互換性管理用) */

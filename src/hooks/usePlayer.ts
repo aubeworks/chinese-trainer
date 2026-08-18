@@ -14,9 +14,16 @@ export interface PlayerOptions {
   voiceURI: string | null
   shuffle: boolean
   repeat: boolean
+  /** シャドーイング: 復唱ポーズの長さ倍率 */
+  shadowPauseScale?: number
+  /** シャドーイング: ポーズ後にもう一度再生する */
+  shadowRepeat?: boolean
   /** 1教材の再生が完了するたびに呼ばれる(学習履歴の記録用) */
   onItemPlayed?: (item: Item) => void
 }
+
+/** シャドーイングの進行状態 */
+export type ShadowPhase = 'none' | 'speak' | 'pause' | 'confirm'
 
 export interface Player {
   /** 再生順に並んだ教材 */
@@ -24,6 +31,10 @@ export interface Player {
   index: number
   current: Item | null
   playing: boolean
+  /** シャドーイングの進行状態(shadowモード以外では 'none') */
+  shadowPhase: ShadowPhase
+  /** 復唱ポーズの終了予定時刻(カウントダウン表示用) */
+  pauseUntil: number | null
   play: () => void
   pause: () => void
   toggle: () => void
@@ -42,10 +53,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 export function usePlayer(options: PlayerOptions): Player {
-  const { items, mode, rate, voiceURI, shuffle, repeat, onItemPlayed } = options
+  const { items, mode, rate, voiceURI, shuffle, repeat, shadowPauseScale, shadowRepeat, onItemPlayed } = options
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [shuffleSeed, setShuffleSeed] = useState(0)
+  const [shadowPhase, setShadowPhase] = useState<ShadowPhase>('none')
+  const [pauseUntil, setPauseUntil] = useState<number | null>(null)
 
   // 再生キャンセル用トークン。値が変わったら進行中のループは停止する。
   const tokenRef = useRef(0)
@@ -60,8 +73,8 @@ export function usePlayer(options: PlayerOptions): Player {
   orderedRef.current = ordered
 
   // 最新の設定をループから参照するためのref
-  const optsRef = useRef({ mode, rate, voiceURI, repeat, onItemPlayed })
-  optsRef.current = { mode, rate, voiceURI, repeat, onItemPlayed }
+  const optsRef = useRef({ mode, rate, voiceURI, repeat, shadowPauseScale, shadowRepeat, onItemPlayed })
+  optsRef.current = { mode, rate, voiceURI, repeat, shadowPauseScale, shadowRepeat, onItemPlayed }
 
   // 教材リストが変わったらインデックスを丸める
   useEffect(() => {
@@ -107,6 +120,33 @@ export function usePlayer(options: PlayerOptions): Player {
         // 高速中国語: 速度設定に関わらず2.0倍で再生
         await speakZh(item.zh, 2.0, o.voiceURI)
         break
+      case 'shadow': {
+        // シャドーイング: 再生 → 復唱ポーズ → (設定により)もう一度再生
+        setShadowPhase('speak')
+        const t0 = Date.now()
+        await speakZh(item.zh, o.rate, o.voiceURI)
+        const measured = Date.now() - t0
+        if (!alive()) return
+        // 音声が出ない環境でも破綻しないよう、文字数からの推定時間と大きい方を使う
+        const estimated = (item.zh.length * 320) / (o.rate || 1)
+        const scale = o.shadowPauseScale ?? 1.2
+        const pauseMs = Math.max(measured, estimated) * scale + 500
+        const until = Date.now() + pauseMs
+        setShadowPhase('pause')
+        setPauseUntil(until)
+        await sleep(pauseMs)
+        setPauseUntil(null)
+        if (!alive()) return
+        if (o.shadowRepeat ?? true) {
+          setShadowPhase('confirm')
+          await speakZh(item.zh, o.rate, o.voiceURI)
+          if (!alive()) return
+          // 答え合わせ後、次に進む前に一呼吸
+          await sleep(600)
+        }
+        setShadowPhase('none')
+        break
+      }
     }
   }, [])
 
@@ -116,6 +156,8 @@ export function usePlayer(options: PlayerOptions): Player {
       const token = ++tokenRef.current
       cancelSpeech()
       setPlaying(true)
+      setShadowPhase('none')
+      setPauseUntil(null)
       void (async () => {
         let i = startIndex
         while (true) {
@@ -152,6 +194,8 @@ export function usePlayer(options: PlayerOptions): Player {
     tokenRef.current++
     cancelSpeech()
     setPlaying(false)
+    setShadowPhase('none')
+    setPauseUntil(null)
   }, [])
 
   const toggle = useCallback(() => {
@@ -191,6 +235,8 @@ export function usePlayer(options: PlayerOptions): Player {
     index,
     current: ordered[index] ?? null,
     playing,
+    shadowPhase,
+    pauseUntil,
     play,
     pause,
     toggle,

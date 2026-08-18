@@ -1,11 +1,13 @@
 // 聞き流し画面: アプリの中心機能
 // 中国語→ピンイン→日本語を中央に表示し、下部の操作バーで再生を制御する。
 // 画面を開いたまま、再生対象(教材パック・プレイリスト等)を切り替えられる。
+// 再生モード「シャドーイング」では、再生→復唱ポーズ→再確認再生を自動で繰り返す。
 // キーボードショートカット: Space=再生/停止, ←→=前へ/次へ
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import SpeedSelector from '../components/SpeedSelector'
 import VoiceSelector from '../components/VoiceSelector'
+import SourceSelector from '../components/SourceSelector'
 import EmptyState from '../components/EmptyState'
 import { useApp } from '../store/AppContext'
 import { usePlayer } from '../hooks/usePlayer'
@@ -14,13 +16,14 @@ import { useVoices } from '../hooks/useVoices'
 import { PLAY_MODE_LABELS, type PlayMode } from '../types'
 
 export default function ListenPage() {
-  const { settings, updateSettings, updateItem, recordStudy, packs, playlists, queue, touchRecentPack, touchRecentPlaylist } =
-    useApp()
+  const { settings, updateSettings, updateItem, recordStudy, touchRecentPack, touchRecentPlaylist } = useApp()
   const { items, label, src } = useSourceItems()
   const { available } = useVoices()
   const [params, setParams] = useSearchParams()
   const [shuffle, setShuffle] = useState(false)
   const [repeat, setRepeat] = useState(true)
+  // 復唱ポーズの残り秒数(カウントダウン表示用)
+  const [pauseLeft, setPauseLeft] = useState(0)
 
   const player = usePlayer({
     items,
@@ -29,10 +32,27 @@ export default function ListenPage() {
     voiceURI: settings.voiceURI,
     shuffle,
     repeat,
+    shadowPauseScale: settings.shadowPauseScale,
+    shadowRepeat: settings.shadowRepeat,
     onItemPlayed: (item) => recordStudy([item.id], src === 'srs'),
   })
 
   const current = player.current
+  const isShadow = settings.playMode === 'shadow'
+
+  // シャドーイング: ポーズ残り時間のカウントダウン
+  useEffect(() => {
+    if (player.shadowPhase !== 'pause' || player.pauseUntil === null) {
+      setPauseLeft(0)
+      return
+    }
+    const tick = () => {
+      setPauseLeft(Math.max(0, Math.ceil(((player.pauseUntil ?? 0) - Date.now()) / 1000)))
+    }
+    tick()
+    const timer = window.setInterval(tick, 250)
+    return () => window.clearInterval(timer)
+  }, [player.shadowPhase, player.pauseUntil])
 
   // 再生対象が変わったら先頭に戻す
   const prevSrcRef = useRef(src)
@@ -58,40 +78,6 @@ export default function ListenPage() {
     if (value.startsWith('playlist:')) touchRecentPlaylist(value.slice(9))
   }
 
-  /** 再生対象セレクター(通常表示・空表示の両方で使う) */
-  const sourceSelector = (
-    <select
-      value={src}
-      onChange={(e) => changeSource(e.target.value)}
-      aria-label="再生対象の選択"
-      style={{ width: 'auto', maxWidth: '100%' }}
-    >
-      <option value="all">📚 すべての教材</option>
-      <option value="queue">📋 学習キュー ({queue.length})</option>
-      <option value="srs">🔁 今日のSRS復習</option>
-      <option value="weak">⚠ 苦手</option>
-      <option value="favorite">★ お気に入り</option>
-      {packs.length > 0 && (
-        <optgroup label="教材パック">
-          {packs.map((p) => (
-            <option key={p.id} value={`pack:${p.id}`}>
-              {p.icon} {p.name}
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {playlists.length > 0 && (
-        <optgroup label="プレイリスト">
-          {playlists.map((pl) => (
-            <option key={pl.id} value={`playlist:${pl.id}`}>
-              🎵 {pl.name}
-            </option>
-          ))}
-        </optgroup>
-      )}
-    </select>
-  )
-
   // キーボードショートカット(PC)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -114,7 +100,9 @@ export default function ListenPage() {
     return (
       <div className="page">
         <h1 className="page-title">聞き流し</h1>
-        <div className="btn-row" style={{ marginBottom: 8 }}>{sourceSelector}</div>
+        <div className="btn-row" style={{ marginBottom: 8 }}>
+          <SourceSelector value={src} onChange={changeSource} />
+        </div>
         <EmptyState
           icon="🎧"
           message={`「${label}」に再生できる教材がありません`}
@@ -127,11 +115,14 @@ export default function ListenPage() {
     )
   }
 
+  // シャドーイングで文字を隠すか(再確認再生では表示する)
+  const hideText = isShadow && settings.shadowHideText && player.playing && player.shadowPhase !== 'confirm'
+
   return (
     <div className="page player-page">
       <h1 className="page-title">聞き流し</h1>
       <div className="btn-row" style={{ marginBottom: 8 }}>
-        {sourceSelector}
+        <SourceSelector value={src} onChange={changeSource} />
         <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
           {player.index + 1} / {player.ordered.length}
           {params.get('src') === 'srs' && ' - SRS復習として記録されます'}
@@ -144,9 +135,26 @@ export default function ListenPage() {
       <div className="player-display">
         {current && (
           <>
-            <div className="zh-text">{current.zh}</div>
-            <div className="pinyin-text">{current.pinyin}</div>
-            <div className="ja-text">{current.ja}</div>
+            {/* シャドーイングの進行表示 */}
+            {isShadow && player.playing && (
+              <div className={`shadow-status ${player.shadowPhase}`}>
+                {player.shadowPhase === 'speak' && '🎧 よく聞いてください'}
+                {player.shadowPhase === 'pause' && `👄 復唱してください(あと ${pauseLeft} 秒)`}
+                {player.shadowPhase === 'confirm' && '✅ 答え合わせ'}
+              </div>
+            )}
+
+            {hideText ? (
+              <div className="zh-text" style={{ color: 'var(--text-muted)' }}>
+                🙈 文字は非表示です
+              </div>
+            ) : (
+              <>
+                <div className="zh-text">{current.zh}</div>
+                <div className="pinyin-text">{current.pinyin}</div>
+                <div className="ja-text">{current.ja}</div>
+              </>
+            )}
             <div>
               <button
                 type="button"
@@ -222,6 +230,38 @@ export default function ListenPage() {
           </button>
           <VoiceSelector value={settings.voiceURI} onChange={(voiceURI) => updateSettings({ voiceURI })} />
         </div>
+
+        {/* シャドーイング専用オプション */}
+        {isShadow && (
+          <div className="player-options" style={{ marginTop: 8 }}>
+            <select
+              value={settings.shadowPauseScale}
+              onChange={(e) => updateSettings({ shadowPauseScale: Number(e.target.value) })}
+              style={{ width: 'auto' }}
+              aria-label="復唱ポーズの長さ"
+            >
+              <option value={0.8}>ポーズ短め</option>
+              <option value={1.2}>ポーズ標準</option>
+              <option value={1.6}>ポーズ長め</option>
+            </select>
+            <button
+              type="button"
+              className={`btn btn-sm ${settings.shadowRepeat ? 'active' : ''}`}
+              onClick={() => updateSettings({ shadowRepeat: !settings.shadowRepeat })}
+              title="復唱後にもう一度再生して答え合わせ"
+            >
+              ✅ 再確認再生
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${settings.shadowHideText ? 'active' : ''}`}
+              onClick={() => updateSettings({ shadowHideText: !settings.shadowHideText })}
+              title="再生・復唱中は文字を隠す(耳だけで復唱する上級モード)"
+            >
+              🙈 文字を隠す
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

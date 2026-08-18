@@ -10,6 +10,7 @@ import PlaylistsPage from './pages/PlaylistsPage'
 import QueuePage from './pages/QueuePage'
 import ListenPage from './pages/ListenPage'
 import FlashPage from './pages/FlashPage'
+import PronouncePage from './pages/PronouncePage'
 import ArticlesPage from './pages/ArticlesPage'
 import RssPage from './pages/RssPage'
 import PastePage from './pages/PastePage'
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/listen" element={<ListenPage />} />
           <Route path="/flash" element={<FlashPage />} />
+          <Route path="/pronounce" element={<PronouncePage />} />
           <Route path="/articles" element={<ArticlesPage />} />
           <Route path="/rss" element={<RssPage />} />
           <Route path="/paste" element={<PastePage />} />

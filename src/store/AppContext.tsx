@@ -40,6 +40,9 @@ export const DEFAULT_SETTINGS: Settings = {
   recentPlaylistIds: [],
   recentPackIds: [],
   lastBackupAt: null,
+  shadowPauseScale: 1.2,
+  shadowRepeat: true,
+  shadowHideText: false,
 }
 
 /** インポート結果の統計 */

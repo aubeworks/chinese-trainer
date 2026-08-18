@@ -10,7 +10,8 @@ Chinese Trainerはフロントエンド完結型のSPAです。サーバー・�
 ├── 状態管理 (src/store/AppContext.tsx)  … 全データをメモリに保持し、変更のたびに永続化
 ├── サービス層 (src/services)
 │   ├── storage.ts       IndexedDB (idb) / localStorageフォールバック
-│   ├── speech.ts        Web Speech API ラッパー
+│   ├── speech.ts        Web Speech API ラッパー(読み上げ+音声認識)
+│   ├── pronounce.ts     発音判定(ピンイン音節アライメント採点)
 │   ├── pinyin.ts        pinyin-pro によるピンイン生成
 │   ├── srs.ts           簡易SRSロジック
 │   ├── importExport.ts  JSON/CSV インポート・エクスポート・正規化

@@ -738,3 +738,79 @@ hr {
   min-height: 100vh;
   color: var(--text-muted);
 }
+
+/* ---- シャドーイング ---- */
+
+.shadow-status {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.shadow-status.pause {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.shadow-status.confirm {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+[data-theme='dark'] .shadow-status.confirm {
+  background: #1d3a28;
+  color: #6ee7a0;
+}
+
+/* ---- 発音判定 ---- */
+
+.pron-char {
+  display: inline-block;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 2px;
+  font-family: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}
+
+.pron-char.ok {
+  color: #15803d;
+}
+
+.pron-char.tone {
+  color: #b45309;
+  text-decoration: underline wavy;
+}
+
+.pron-char.wrong {
+  color: #b91c1c;
+  text-decoration: underline;
+}
+
+[data-theme='dark'] .pron-char.ok {
+  color: #6ee7a0;
+}
+
+[data-theme='dark'] .pron-char.tone {
+  color: #f0b060;
+}
+
+[data-theme='dark'] .pron-char.wrong {
+  color: #f08080;
+}
+
+.mic-listening {
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

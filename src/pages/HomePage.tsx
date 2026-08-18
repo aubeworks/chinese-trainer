@@ -54,6 +54,9 @@ export default function HomePage() {
         <Link to="/flash" className="btn">
           ⚡ 瞬発練習
         </Link>
+        <Link to="/pronounce" className="btn">
+          🎤 発音練習
+        </Link>
         <Link to="/srs" className="btn">
           🔁 SRS復習 {due.length > 0 && `(${due.length})`}
         </Link>

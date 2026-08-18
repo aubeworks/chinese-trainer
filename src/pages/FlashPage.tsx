@@ -7,7 +7,8 @@ import EmptyState from '../components/EmptyState'
 import SpeedSelector from '../components/SpeedSelector'
 import { useApp } from '../store/AppContext'
 import { useSourceItems } from '../hooks/useSourceItems'
-import { cancelSpeech, speakZh } from '../services/speech'
+import { cancelSpeech, recognitionAvailable, recognizeSpeech, speakZh } from '../services/speech'
+import { evaluatePronunciation, type PronounceEval } from '../services/pronounce'
 import { shuffled } from '../utils'
 import type { SrsGrade } from '../types'
 
@@ -21,6 +22,11 @@ export default function FlashPage() {
   const [remaining, setRemaining] = useState(settings.flashSeconds)
   const [autoReveal, setAutoReveal] = useState(true)
   const timerRef = useRef<number | null>(null)
+  // 発音チェック(回答表示後にマイクで試せる)
+  const [micListening, setMicListening] = useState(false)
+  const [micResult, setMicResult] = useState<(PronounceEval & { recognized: string }) | null>(null)
+  const [micError, setMicError] = useState('')
+  const micAvailable = useMemo(() => recognitionAvailable(), [])
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
 
@@ -76,12 +82,30 @@ export default function FlashPage() {
   const next = useCallback(() => {
     cancelSpeech()
     setRevealed(false)
+    setMicResult(null)
+    setMicError('')
     setIndex((i) => (i + 1 < order.length ? i + 1 : 0))
     if (index + 1 >= order.length) {
       // 一周したら再シャッフル
       setOrder((o) => shuffled(o))
     }
   }, [order.length, index])
+
+  /** 回答表示後の発音チェック */
+  const micCheck = async () => {
+    if (!current || micListening) return
+    cancelSpeech()
+    setMicError('')
+    setMicResult(null)
+    setMicListening(true)
+    const r = await recognizeSpeech('zh-CN')
+    setMicListening(false)
+    if (!r.ok) {
+      setMicError(r.error)
+      return
+    }
+    setMicResult({ ...evaluatePronunciation(current.zh, r.text), recognized: r.text })
+  }
 
   const grade = (g: SrsGrade) => {
     if (!current) return
@@ -171,7 +195,30 @@ export default function FlashPage() {
                 >
                   ⚠ 苦手
                 </button>
+                {micAvailable && (
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${micListening ? 'mic-listening' : ''}`}
+                    onClick={() => void micCheck()}
+                    disabled={micListening}
+                    title="発音してみて音声認識でチェック"
+                  >
+                    {micListening ? '🎙 認識中…' : '🎤 発音チェック'}
+                  </button>
+                )}
               </div>
+              {micError && <div className="error-box">{micError}</div>}
+              {micResult && (
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{ fontWeight: 700, fontSize: '1.2rem' }}>{micResult.score}点</span>{' '}
+                  {micResult.charResults.map((c, i) => (
+                    <span key={i} className={`pron-char ${c.status}`} style={{ fontSize: '1.2rem' }}>
+                      {c.char}
+                    </span>
+                  ))}
+                  <div className="memo-text">認識: {micResult.recognized}(緑=OK / 橙=声調 / 赤=音)</div>
+                </div>
+              )}
               {/* SRS評価 */}
               <div className="btn-row" style={{ justifyContent: 'center' }}>
                 <button type="button" className="btn btn-danger" onClick={() => grade('again')}>
