@@ -19,6 +19,7 @@ const MAIN_NAV: NavItem[] = [
 
 const STUDY_NAV: NavItem[] = [
   { to: '/pronounce', icon: '🎤', label: '発音練習' },
+  { to: '/tones', icon: '🎵', label: '四声クイズ' },
   { to: '/srs', icon: '🔁', label: 'SRS復習' },
   { to: '/articles', icon: '📰', label: '長文' },
   { to: '/queue', icon: '📋', label: '学習キュー' },

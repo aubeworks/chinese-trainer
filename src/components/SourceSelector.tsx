@@ -19,6 +19,7 @@ export default function SourceSelector({ value, onChange }: Props) {
       style={{ width: 'auto', maxWidth: '100%' }}
     >
       <option value="all">📚 すべての教材</option>
+      <option value="smart">✨ おまかせ30件(復習・苦手優先)</option>
       <option value="queue">📋 学習キュー ({queue.length})</option>
       <option value="srs">🔁 今日のSRS復習</option>
       <option value="weak">⚠ 苦手</option>

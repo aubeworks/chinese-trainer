@@ -52,6 +52,55 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+// ---- 画面オフ対策(Wake Lock / Media Session) ----
+
+/** Wake Lock APIの最小型(lib.domに無い環境向け) */
+interface WakeLockSentinelLike {
+  release: () => Promise<void>
+}
+interface WakeLockNavigator {
+  wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinelLike> }
+}
+
+/**
+ * 無音のループ音声を作る。
+ * Web Speech APIの読み上げは「メディア再生」として扱われないため、
+ * 無音のaudioを同時再生することでメディアセッション(ロック画面の再生コントロール)を
+ * 有効にし、バックグラウンドでタブが停止されにくくする。
+ */
+function createSilentAudio(): HTMLAudioElement | null {
+  try {
+    const sampleRate = 8000
+    const dataSize = sampleRate // 1秒分
+    const buf = new ArrayBuffer(44 + dataSize)
+    const v = new DataView(buf)
+    const writeStr = (offset: number, s: string) => {
+      for (let i = 0; i < s.length; i++) v.setUint8(offset + i, s.charCodeAt(i))
+    }
+    writeStr(0, 'RIFF')
+    v.setUint32(4, 36 + dataSize, true)
+    writeStr(8, 'WAVE')
+    writeStr(12, 'fmt ')
+    v.setUint32(16, 16, true)
+    v.setUint16(20, 1, true) // PCM
+    v.setUint16(22, 1, true) // mono
+    v.setUint32(24, sampleRate, true)
+    v.setUint32(28, sampleRate, true)
+    v.setUint16(32, 1, true)
+    v.setUint16(34, 8, true) // 8bit
+    writeStr(36, 'data')
+    v.setUint32(40, dataSize, true)
+    for (let i = 0; i < dataSize; i++) v.setUint8(44 + i, 128) // 8bitの無音は128
+    const url = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+    const audio = new Audio(url)
+    audio.loop = true
+    audio.volume = 0.01
+    return audio
+  } catch {
+    return null
+  }
+}
+
 export function usePlayer(options: PlayerOptions): Player {
   const { items, mode, rate, voiceURI, shuffle, repeat, shadowPauseScale, shadowRepeat, onItemPlayed } = options
   const [index, setIndex] = useState(0)
@@ -88,6 +137,61 @@ export function usePlayer(options: PlayerOptions): Player {
       cancelSpeech()
     }
   }, [])
+
+  // ---- 画面オフ対策: Wake Lock + 無音オーディオ + メディアセッション ----
+  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null)
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null)
+  const playingRef = useRef(false)
+  playingRef.current = playing
+
+  const acquireWakeLock = useCallback(async () => {
+    try {
+      const nav = navigator as Navigator & WakeLockNavigator
+      if (nav.wakeLock && wakeLockRef.current === null) {
+        wakeLockRef.current = await nav.wakeLock.request('screen')
+      }
+    } catch {
+      // 省電力モードなどで拒否されても再生は続行する
+    }
+  }, [])
+
+  const releaseWakeLock = useCallback(() => {
+    void wakeLockRef.current?.release().catch(() => undefined)
+    wakeLockRef.current = null
+  }, [])
+
+  // 再生状態に応じてWake Lock・無音オーディオ・メディアセッション状態を切り替える
+  useEffect(() => {
+    if (playing) {
+      void acquireWakeLock()
+      if (!silentAudioRef.current) silentAudioRef.current = createSilentAudio()
+      void silentAudioRef.current?.play().catch(() => undefined)
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing'
+      }
+    } else {
+      releaseWakeLock()
+      silentAudioRef.current?.pause()
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused'
+      }
+    }
+  }, [playing, acquireWakeLock, releaseWakeLock])
+
+  // タブが再表示されたとき、再生中ならWake Lockを取り直す(画面オフで自動解放されるため)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && playingRef.current) {
+        void acquireWakeLock()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      releaseWakeLock()
+      silentAudioRef.current?.pause()
+    }
+  }, [acquireWakeLock, releaseWakeLock])
 
   /** 1教材をモードに応じて読み上げる */
   const playOne = useCallback(async (item: Item, token: number) => {
@@ -229,6 +333,45 @@ export function usePlayer(options: PlayerOptions): Player {
     setShuffleSeed((s) => s + 1)
     setIndex(0)
   }, [])
+
+  // ロック画面・イヤホンのボタンから操作できるようにする(Media Session)
+  const controlsRef = useRef({ play: () => {}, pause: () => {}, next: () => {}, prev: () => {} })
+  controlsRef.current = { play, pause, next, prev }
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    const ms = navigator.mediaSession
+    const setHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try {
+        ms.setActionHandler(action, handler)
+      } catch {
+        // 未対応のアクションは無視
+      }
+    }
+    setHandler('play', () => controlsRef.current.play())
+    setHandler('pause', () => controlsRef.current.pause())
+    setHandler('nexttrack', () => controlsRef.current.next())
+    setHandler('previoustrack', () => controlsRef.current.prev())
+    return () => {
+      setHandler('play', null)
+      setHandler('pause', null)
+      setHandler('nexttrack', null)
+      setHandler('previoustrack', null)
+    }
+  }, [])
+
+  // 再生中の教材をロック画面に表示する
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return
+    const cur = ordered[index]
+    if (cur && playing) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: cur.zh,
+        artist: cur.ja || cur.pinyin,
+        album: 'Chinese Trainer',
+      })
+    }
+  }, [ordered, index, playing])
 
   return {
     ordered,

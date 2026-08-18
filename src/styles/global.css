@@ -805,6 +805,27 @@ hr {
   animation: mic-pulse 1.2s ease-in-out infinite;
 }
 
+/* ---- 四声クイズ ---- */
+
+.tone-correct {
+  background: #dcfce7 !important;
+  border-color: #15803d !important;
+  color: #15803d !important;
+  font-weight: 700;
+}
+
+.tone-wrong {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+[data-theme='dark'] .tone-correct {
+  background: #1d3a28 !important;
+  border-color: #6ee7a0 !important;
+  color: #6ee7a0 !important;
+}
+
 @keyframes mic-pulse {
   0%,
   100% {

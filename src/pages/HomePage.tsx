@@ -50,14 +50,20 @@ export default function HomePage() {
       </div>
 
       <div className="btn-row" style={{ marginBottom: 20 }}>
-        <Link to="/listen" className="btn btn-primary">
-          🎧 聞き流しを始める
+        <Link to="/listen?src=smart" className="btn btn-primary">
+          ✨ おまかせ学習(30件)
+        </Link>
+        <Link to="/listen" className="btn">
+          🎧 聞き流し
         </Link>
         <Link to="/flash" className="btn">
           ⚡ 瞬発練習
         </Link>
         <Link to="/pronounce" className="btn">
           🎤 発音練習
+        </Link>
+        <Link to="/tones" className="btn">
+          🎵 四声クイズ
         </Link>
         <Link to="/srs" className="btn">
           🔁 SRS復習 {due.length > 0 && `(${due.length})`}
