@@ -43,6 +43,10 @@ export const DEFAULT_SETTINGS: Settings = {
   shadowPauseScale: 1.2,
   shadowRepeat: true,
   shadowHideText: false,
+  syncToken: '',
+  syncGistId: null,
+  syncAuto: true,
+  lastSyncedAt: null,
 }
 
 /** インポート結果の統計 */

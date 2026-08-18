@@ -127,6 +127,14 @@ export interface Settings {
   shadowRepeat: boolean
   /** シャドーイング: 再生・ポーズ中は文字を隠す(上級) */
   shadowHideText: boolean
+  /** 端末間同期: GitHubトークン(gist権限のみ。この端末にのみ保存され、同期データには含めない) */
+  syncToken: string
+  /** 端末間同期: 同期用GistのID(初回アップロード時に自動作成) */
+  syncGistId: string | null
+  /** 端末間同期: アプリ起動時に自動同期する */
+  syncAuto: boolean
+  /** 端末間同期: 最終同期日時 */
+  lastSyncedAt: string | null
 }
 
 /** JSONエクスポート形式(教材パック単位) */

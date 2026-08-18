@@ -1,11 +1,13 @@
 // ホーム画面: 学習状況のサマリーと主要機能へのショートカット
 import { Link } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
+import { useSync } from '../hooks/useSync'
 import { getDueItems } from '../services/srs'
 import { todayStr } from '../utils'
 
 export default function HomePage() {
   const { items, packs, playlists, history, queue, settings } = useApp()
+  const { syncing, lastOutcome, runSync } = useSync()
 
   const today = history.find((h) => h.date === todayStr())
   const due = getDueItems(items)
@@ -65,7 +67,15 @@ export default function HomePage() {
             📋 学習キュー ({queue.length})
           </Link>
         )}
+        {settings.syncToken.trim() && (
+          <button type="button" className="btn" onClick={() => void runSync()} disabled={syncing}>
+            {syncing ? '☁ 同期中…' : '☁ 同期'}
+          </button>
+        )}
       </div>
+      {lastOutcome && (
+        <div className={lastOutcome.ok ? 'info-box' : 'error-box'}>{lastOutcome.message}</div>
+      )}
 
       {recentPlaylists.length > 0 && (
         <>

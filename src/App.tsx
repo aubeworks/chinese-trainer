@@ -1,5 +1,5 @@
-// アプリのルート: ルーティングとテーマ適用
-import { useEffect } from 'react'
+// アプリのルート: ルーティングとテーマ適用、起動時の自動同期
+import { useEffect, useRef } from 'react'
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
@@ -19,9 +19,20 @@ import SettingsPage from './pages/SettingsPage'
 import HistoryPage from './pages/HistoryPage'
 import SrsPage from './pages/SrsPage'
 import { useApp } from './store/AppContext'
+import { useSync } from './hooks/useSync'
 
 export default function App() {
   const { loading, settings } = useApp()
+  const { runSync } = useSync()
+  const autoSynced = useRef(false)
+
+  // 起動時の自動同期(トークン設定済み+自動同期ONのとき1回だけ)
+  useEffect(() => {
+    if (!loading && !autoSynced.current && settings.syncAuto && settings.syncToken.trim()) {
+      autoSynced.current = true
+      void runSync()
+    }
+  }, [loading, settings.syncAuto, settings.syncToken, runSync])
 
   // テーマ適用(auto はOS設定に追従)
   useEffect(() => {

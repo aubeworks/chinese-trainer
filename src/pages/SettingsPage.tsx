@@ -6,6 +6,8 @@ import { useApp } from '../store/AppContext'
 import { exportAll, parseFullExport } from '../services/importExport'
 import { downloadFile, formatDateTime, nowIso, todayStr } from '../utils'
 import { speakZh } from '../services/speech'
+import { verifySyncToken } from '../services/sync'
+import { useSync } from '../hooks/useSync'
 import type { ThemeMode } from '../types'
 
 export default function SettingsPage() {
@@ -14,13 +16,31 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
+  const { syncing, lastOutcome, runSync } = useSync()
+  const [tokenChecking, setTokenChecking] = useState(false)
+  const [syncInfo, setSyncInfo] = useState('')
+
+  /** トークンの接続テスト */
+  const checkToken = async () => {
+    setSyncInfo('')
+    setTokenChecking(true)
+    try {
+      const ok = await verifySyncToken(settings.syncToken.trim())
+      setSyncInfo(ok ? '✅ トークンは有効です。「今すぐ同期」で同期を開始できます。' : 'トークンの確認に失敗しました。')
+    } catch (e) {
+      setSyncInfo(`❌ ${e instanceof Error ? e.message : 'トークンの確認に失敗しました'}`)
+    } finally {
+      setTokenChecking(false)
+    }
+  }
 
   const backup = () => {
     const json = exportAll({
       packs: app.packs,
       items: app.items,
       playlists: app.playlists,
-      settings: app.settings,
+      // トークンはバックアップファイルに含めない(漏えい防止)
+      settings: { ...app.settings, syncToken: '' },
       history: app.history,
       queue: app.queue,
     })
@@ -96,6 +116,73 @@ export default function SettingsPage() {
           onChange={(e) => updateSettings({ rssProxy: e.target.value })}
           placeholder="https://api.allorigins.win/raw?url="
         />
+      </div>
+
+      <h2 className="section-title">☁ 端末間同期(GitHub Gist)</h2>
+      <div className="info-box">
+        PCとスマホの教材・苦手・SRS・学習履歴を同期します(非公開Gistを使用)。
+        <br />
+        <strong>初回設定(両方の端末で同じトークンを貼るだけ):</strong>
+        <br />
+        1.{' '}
+        <a
+          href="https://github.com/settings/tokens/new?scopes=gist&description=chinese-trainer-sync"
+          target="_blank"
+          rel="noreferrer"
+        >
+          このリンク
+        </a>
+        でGitHubトークンを作成(<strong>gist権限のみ</strong>・期限はお好みで)
+        <br />
+        2. 生成されたトークンを下に貼り付け → 接続テスト → 今すぐ同期
+        <br />
+        3. もう一方の端末でも同じトークンを貼って同期(同期先は自動で見つかります)
+      </div>
+      <div className="form-field">
+        <label>GitHubトークン(この端末にのみ保存されます)</label>
+        <input
+          type="password"
+          value={settings.syncToken}
+          onChange={(e) => updateSettings({ syncToken: e.target.value })}
+          placeholder="ghp_..."
+          autoComplete="off"
+        />
+      </div>
+      <div className="btn-row" style={{ marginBottom: 10 }}>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void checkToken()}
+          disabled={!settings.syncToken.trim() || tokenChecking}
+        >
+          {tokenChecking ? '確認中…' : '🔌 接続テスト'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => void runSync()}
+          disabled={!settings.syncToken.trim() || syncing}
+        >
+          {syncing ? '☁ 同期中…' : '☁ 今すぐ同期'}
+        </button>
+        <button
+          type="button"
+          className={`btn ${settings.syncAuto ? 'active' : ''}`}
+          onClick={() => updateSettings({ syncAuto: !settings.syncAuto })}
+        >
+          🔄 起動時に自動同期 {settings.syncAuto ? 'ON' : 'OFF'}
+        </button>
+      </div>
+      {syncInfo && <div className="info-box">{syncInfo}</div>}
+      {lastOutcome && (
+        <div className={lastOutcome.ok ? 'info-box' : 'error-box'}>{lastOutcome.message}</div>
+      )}
+      <div className="info-box">
+        最終同期:{' '}
+        <strong>{settings.lastSyncedAt ? formatDateTime(settings.lastSyncedAt) : '未実施'}</strong>
+        <br />
+        仕組み: 同じ教材は「更新が新しい方」が残ります。設定と学習キューは端末ごとに独立です。
+        削除は同期されません(削除した教材が他端末に残っていると復活します)。
       </div>
 
       <h2 className="section-title">データ管理</h2>
