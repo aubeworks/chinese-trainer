@@ -28,7 +28,9 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}']
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // 内蔵教材ライブラリのチャンクが大きいため、既定の2MiB上限を引き上げてオフラインでも使えるようにする
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024
       }
     })
   ]

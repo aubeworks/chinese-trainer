@@ -1,11 +1,12 @@
 // アプリのルート: ルーティングとテーマ適用、起動時の自動同期
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import ItemsPage from './pages/ItemsPage'
 import ItemEditPage from './pages/ItemEditPage'
-import PacksPage from './pages/PacksPage'
+// 教材パック画面は内蔵ライブラリ(数千件のデータ)を含むため、起動を軽くするよう遅延読み込みする
+const PacksPage = lazy(() => import('./pages/PacksPage'))
 import PlaylistsPage from './pages/PlaylistsPage'
 import QueuePage from './pages/QueuePage'
 import ListenPage from './pages/ListenPage'
@@ -58,7 +59,14 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/items/:id" element={<ItemEditPage />} />
-          <Route path="/packs" element={<PacksPage />} />
+          <Route
+            path="/packs"
+            element={
+              <Suspense fallback={<div className="loading-screen">教材ライブラリを読み込み中…</div>}>
+                <PacksPage />
+              </Suspense>
+            }
+          />
           <Route path="/playlists" element={<PlaylistsPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/listen" element={<ListenPage />} />

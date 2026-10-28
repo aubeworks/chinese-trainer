@@ -1,20 +1,12 @@
 // 内蔵教材ライブラリ
 // 「教材パック」画面からワンクリックで追加できる教材集。
 // ピンインは追加時に pinyin-pro で自動生成される(normalizeItem経由)。
-// エントリは容量節約のためタプル形式:
-//   [種類('w'=word/'s'=sentence/'a'=article), カテゴリ, サブカテゴリ, 中国語, 日本語, 難易度, タグ?]
+// エントリは容量節約のためタプル形式(型は libraryTypes.ts)。
+// このファイルの配列は採番を固定するため今後は変更せず、追加分は extra/ 配下に置く。
 import type { Item, ItemType, Pack } from '../types'
 import { normalizeItem, normalizePack } from '../services/importExport'
-
-type Entry = [
-  t: 'w' | 's' | 'a',
-  category: string,
-  subcategory: string,
-  zh: string,
-  ja: string,
-  difficulty: number,
-  tags?: string[],
-]
+import type { Entry } from './libraryTypes'
+import { EXTRA_PARTS } from './extra'
 
 const TYPE_MAP: Record<'w' | 's' | 'a', ItemType> = { w: 'word', s: 'sentence', a: 'article' }
 
@@ -3619,7 +3611,7 @@ export const LIBRARY_INDEX = defs.map((d) => ({
   description: d.description,
   icon: d.icon,
   color: d.color,
-  count: d.entries.length,
+  count: d.entries.length + (EXTRA_PARTS[d.id] ?? []).reduce((sum, p) => sum + p.entries.length, 0),
 }))
 
 /** 指定IDのライブラリパックを正規化して返す(ピンイン自動生成込み) */
@@ -3631,11 +3623,10 @@ export function getLibraryPack(id: string): { pack: Pack; items: Item[] } | null
     def.name
   )
   const items: Item[] = []
-  let n = def.idStart ?? 0
-  for (const [t, category, subcategory, zh, ja, difficulty, tags] of def.entries) {
+  const push = (id: string, [t, category, subcategory, zh, ja, difficulty, tags]: Entry) => {
     const item = normalizeItem(
       {
-        id: `${def.id}-${String(++n).padStart(3, '0')}`,
+        id,
         type: TYPE_MAP[t],
         category,
         subcategory,
@@ -3649,6 +3640,13 @@ export function getLibraryPack(id: string): { pack: Pack; items: Item[] } | null
       pack.id
     )
     if (item) items.push(item)
+  }
+  let n = def.idStart ?? 0
+  for (const e of def.entries) push(`${def.id}-${String(++n).padStart(3, '0')}`, e)
+  // 追加パートはキーごとに独立して採番する(他パートの件数が変わってもIDがずれない)
+  for (const part of EXTRA_PARTS[def.id] ?? []) {
+    let k = 0
+    for (const e of part.entries) push(`${def.id}-${part.key}-${String(++k).padStart(3, '0')}`, e)
   }
   return { pack, items }
 }

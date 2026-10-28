@@ -22,6 +22,7 @@ export default function PacksPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [libBusy, setLibBusy] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const countByPack = (packId: string) => items.filter((i) => i.packId === packId).length
@@ -106,17 +107,26 @@ export default function PacksPage() {
     setError('')
   }
 
-  /** 内蔵ライブラリをすべて追加する */
-  const addAllLibraryPacks = () => {
+  /**
+   * 内蔵ライブラリをすべて追加する。
+   * 数千件のピンイン生成で画面が固まらないよう、1パックごとに描画へ処理を譲る。
+   */
+  const addAllLibraryPacks = async () => {
+    if (libBusy) return
+    setLibBusy(true)
+    setError('')
     const lines: string[] = []
+    let i = 0
     for (const entry of LIBRARY_INDEX) {
+      setMessage(`追加中… ${++i} / ${LIBRARY_INDEX.length}(${entry.name})`)
+      await new Promise((r) => setTimeout(r, 0))
       const data = getLibraryPack(entry.id)
       if (!data) continue
       const { added, duplicates } = importPackData(data.pack, data.items)
       lines.push(`【${data.pack.name}】 ${added}件追加 / ${duplicates}件重複`)
     }
     setMessage(`ライブラリ追加結果\n${lines.join('\n')}`)
-    setError('')
+    setLibBusy(false)
   }
 
   return (
@@ -232,8 +242,13 @@ export default function PacksPage() {
         {LIBRARY_INDEX.reduce((sum, e) => sum + e.count, 0)}件)。追加済みでも重複はスキップされます。
       </p>
       <div className="btn-row" style={{ marginBottom: 10 }}>
-        <button type="button" className="btn btn-sm btn-primary" onClick={addAllLibraryPacks}>
-          ⬇ すべて追加
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          onClick={() => void addAllLibraryPacks()}
+          disabled={libBusy}
+        >
+          {libBusy ? '⏳ 追加中…' : '⬇ すべて追加'}
         </button>
       </div>
       {LIBRARY_INDEX.map((entry) => {
